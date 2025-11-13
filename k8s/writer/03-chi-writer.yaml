@@ -1,0 +1,83 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: ch-aa
+  namespace: clickhouse
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: ch-keeper-0.ch-keeper.clickhouse-infra.svc.cluster.local
+          port: 2181
+        - host: ch-keeper-1.ch-keeper.clickhouse-infra.svc.cluster.local
+          port: 2181
+        - host: ch-keeper-2.ch-keeper.clickhouse-infra.svc.cluster.local
+          port: 2181
+
+    clusters:
+      - name: s1
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+
+    settings:
+      listen_host: 0.0.0.0
+      interserver_http_host: 79.99.47.121   # REPLACE with writer ch-interserver EXTERNAL-IP
+      interserver_http_port: 9009
+
+    files:
+      config.d/99-interserver.xml: |
+        <clickhouse>
+          <interserver_http_host>79.99.47.121</interserver_http_host>
+          <interserver_http_port>9009</interserver_http_port>
+        </clickhouse>
+
+      config.d/interserver.xml: |
+        <clickhouse>
+          <interserver_http_host>79.99.47.121</interserver_http_host>
+          <interserver_http_port>9009</interserver_http_port>
+        </clickhouse>
+
+      config.d/storage.xml: |
+        <clickhouse>
+          <storage_configuration>
+            <disks>
+              <minio>
+                <type>s3</type>
+                <endpoint>https://s3-api.illapa.cloud/opexx/</endpoint>
+                <access_key_id>YOUR_MINIO_ACCESS_KEY</access_key_id>
+                <secret_access_key>YOUR_MINIO_SECRET_KEY</secret_access_key>
+              </minio>
+            </disks>
+            <policies>
+              <external>
+                <volumes>
+                  <s3>
+                    <disk>minio</disk>
+                  </s3>
+                </volumes>
+              </external>
+            </policies>
+          </storage_configuration>
+
+          <listen_host>0.0.0.0</listen_host>
+          <path>/data/clickhouse/</path>
+
+          <user_directories>
+            <local_directory>
+              <path>/data/</path>
+            </local_directory>
+          </user_directories>
+        </clickhouse>
+
+      users.d/99-access-override.xml: |
+        <clickhouse>
+          <users>
+            <default>
+              <access_management>1</access_management>
+              <show_named_collections>1</show_named_collections>
+              <show_named_collections_secrets>1</show_named_collections_secrets>
+              <allow_introspection_functions>1</allow_introspection_functions>
+            </default>
+          </users>
+        </clickhouse>

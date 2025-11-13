@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ch-keeper
+  namespace: clickhouse-infra
+spec:
+  serviceName: ch-keeper
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ch-keeper
+  template:
+    metadata:
+      labels:
+        app: ch-keeper
+    spec:
+      initContainers:
+        - name: render-config
+          image: busybox:1.36
+          command: ["/bin/sh","-c"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: keeper-config
+              mountPath: /etc/clickhouse-keeper
+            - name: cfg-tpl
+              mountPath: /tpl
+          args:
+            - |
+              ORD=${POD_NAME##*-}
+              SID=$((ORD+1))
+              sed "s/{{SERVER_ID}}/${SID}/g" /tpl/config.xml.tpl > /etc/clickhouse-keeper/keeper_config.xml
+      containers:
+        - name: keeper
+          image: clickhouse/clickhouse-keeper:latest
+          ports:
+            - name: zk
+              containerPort: 2181
+            - name: raft
+              containerPort: 9444
+          volumeMounts:
+            - name: keeper-config
+              mountPath: /etc/clickhouse-keeper
+            - name: data
+              mountPath: /var/lib/clickhouse-keeper
+      volumes:
+        - name: cfg-tpl
+          configMap:
+            name: ch-keeper-cfg-template
+        - name: keeper-config
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

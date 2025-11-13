@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ch-interserver
+  namespace: clickhouse
+spec:
+  type: LoadBalancer
+  selector:
+    clickhouse.altinity.com/chi: ch-aa
+  ports:
+    - name: interserver
+      port: 9009
+      targetPort: 9009
